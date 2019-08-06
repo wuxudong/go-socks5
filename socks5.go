@@ -112,20 +112,12 @@ func (s *Server) SetCredentials(credentials CredentialStore) {
 
 // Serve is used to serve connections from a listener
 func (s *Server) Serve(l net.Listener) error {
-	errChan := make(chan error)
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			return err
 		}
-		go func(net.Conn) {
-			if err := s.ServeConn(conn); err != nil {
-				errChan <- err
-			} else {
-				errChan <- nil
-			}
-		}(conn)
-		return <-errChan
+		go s.ServeConn(conn)
 	}
 }
 
