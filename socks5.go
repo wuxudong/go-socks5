@@ -2,12 +2,11 @@ package socks5
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"net"
 	"os"
-
-	"golang.org/x/net/context"
 )
 
 const (
@@ -50,7 +49,7 @@ type Config struct {
 	Dial func(ctx context.Context, network, addr string) (net.Conn, error)
 }
 
-// Server is reponsible for accepting connections and handling
+// Server is responsible for accepting connections and handling
 // the details of the SOCKS5 protocol
 type Server struct {
 	config      *Config
@@ -105,16 +104,29 @@ func (s *Server) ListenAndServe(network, addr string) error {
 	return s.Serve(l)
 }
 
+// SetCredentials is used to reset user password credentials
+func (s *Server) SetCredentials(credentials CredentialStore) {
+	authenticator := UserPassAuthenticator{credentials}
+	s.authMethods[authenticator.GetCode()] = authenticator
+}
+
 // Serve is used to serve connections from a listener
 func (s *Server) Serve(l net.Listener) error {
+	errChan := make(chan error)
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			return err
 		}
-		go s.ServeConn(conn)
+		go func(net.Conn) {
+			if err := s.ServeConn(conn); err != nil {
+				errChan <- err
+			} else {
+				errChan <- nil
+			}
+		}(conn)
+		return <-errChan
 	}
-	return nil
 }
 
 // ServeConn is used to serve a single connection.
